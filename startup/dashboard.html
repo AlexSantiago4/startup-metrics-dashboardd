@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Startup Metrics Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .kpis, form {
+      background: white;
+      padding: 20px;
+      margin: 0 auto 20px;
+      max-width: 800px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    .kpi {
+      margin-bottom: 10px;
+    }
+
+    .kpi.good {
+      color: green;
+    }
+
+    .kpi.bad {
+      color: red;
+    }
+
+    form input {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      box-sizing: border-box;
+    }
+
+    form button {
+      padding: 10px 20px;
+      background: #007BFF;
+      color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    form button:hover {
+      background: #0056b3;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      max-width: 800px;
+      margin: 0 auto;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    th, td {
+      padding: 10px;
+      border: 1px solid #ddd;
+      text-align: center;
+    }
+
+    .delete-btn {
+      color: red;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📊 Startup Metrics Dashboard</h1>
+
+  <div class="kpis">
+    <h2>📈 KPIs & Insights</h2>
+    <div class="kpi" id="total-revenue">Total Revenue: $0</div>
+    <div class="kpi" id="avg-burn-rate">Average Burn Rate: $0</div>
+    <div class="kpi" id="runway">Runway: 0 months</div>
+    <div class="kpi" id="growth-rate">Customer Growth: -</div>
+    <div class="kpi" id="net-revenue-growth">Net Revenue Growth: -</div>
+  </div>
+
+  <form id="metrics-form">
+    <input type="text" id="period" placeholder="Month/Period (e.g. Jan 2025)" required />
+    <input type="number" id="mrr" placeholder="Monthly Recurring Revenue (MRR)" required />
+    <input type="number" id="customers" placeholder="New Customers Acquired" required />
+    <input type="number" id="churn" placeholder="Customer Churn" required />
+    <input type="number" id="expenses" placeholder="Operating Expenses" required />
+    <input type="number" id="cash" placeholder="Cash Balance" required />
+    <button type="submit">Add Entry</button>
+  </form>
+
+  <table id="metrics-table">
+    <thead>
+      <tr>
+        <th>Period</th>
+        <th>MRR</th>
+        <th>Customers</th>
+        <th>Churn</th>
+        <th>Expenses</th>
+        <th>Cash</th>
+        <th>Delete</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const form = document.getElementById('metrics-form');
+    const tableBody = document.querySelector('#metrics-table tbody');
+    let data = JSON.parse(localStorage.getItem('startupMetrics')) || [];
+
+    function updateLocalStorage() {
+      localStorage.setItem('startupMetrics', JSON.stringify(data));
+    }
+
+    function renderTable() {
+      tableBody.innerHTML = '';
+      data.forEach((entry, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${entry.period}</td>
+          <td>$${entry.mrr}</td>
+          <td>${entry.customers}</td>
+          <td>${entry.churn}</td>
+          <td>$${entry.expenses}</td>
+          <td>$${entry.cash}</td>
+          <td><span class="delete-btn" onclick="deleteEntry(${index})">❌</span></td>
+        `;
+        tableBody.appendChild(row);
+      });
+    }
+
+    function calculateKPIs() {
+      if (data.length === 0) {
+        // Reset KPIs to default
+        document.getElementById('total-revenue').textContent = 'Total Revenue: $0';
+        document.getElementById('avg-burn-rate').textContent = 'Average Burn Rate: $0';
+        document.getElementById('runway').textContent = 'Runway: 0 months';
+        document.getElementById('growth-rate').textContent = 'Customer Growth: -';
+        document.getElementById('net-revenue-growth').textContent = 'Net Revenue Growth: -';
+
+        document.getElementById('runway').className = 'kpi';
+        document.getElementById('growth-rate').className = 'kpi';
+        document.getElementById('net-revenue-growth').className = 'kpi';
+        return;
+      }
+
+      const totalRevenue = data.reduce((sum, e) => sum + Number(e.mrr), 0);
+      const avgBurnRate = data.reduce((sum, e) => sum + Number(e.expenses), 0) / data.length;
+      const latestCash = data[data.length - 1].cash;
+      const runway = avgBurnRate > 0 ? (latestCash / avgBurnRate).toFixed(1) : '∞';
+
+      let customerGrowth = '-';
+      let netRevenueGrowth = '-';
+
+      if (data.length >= 2) {
+        const prev = data[data.length - 2];
+        const curr = data[data.length - 1];
+
+        const custDiff = curr.customers - prev.customers;
+        const revDiff = curr.mrr - prev.mrr;
+
+        customerGrowth = custDiff >= 0 ? `⬆️ +${custDiff}` : `⬇️ ${custDiff}`;
+        netRevenueGrowth = revDiff >= 0
+          ? `🟢 +$${revDiff}`
+          : `🔴 -$${Math.abs(revDiff)}`;
+      }
+
+      document.getElementById('total-revenue').textContent = `Total Revenue: $${totalRevenue}`;
+      document.getElementById('avg-burn-rate').textContent = `Average Burn Rate: $${avgBurnRate.toFixed(2)}`;
+      document.getElementById('runway').textContent = `Runway: ${runway} months`;
+      document.getElementById('growth-rate').textContent = `Customer Growth: ${customerGrowth}`;
+      document.getElementById('net-revenue-growth').textContent = `Net Revenue Growth: ${netRevenueGrowth}`;
+
+      // Add color classes for KPIs
+      document.getElementById('runway').className = 'kpi ' + (parseFloat(runway) >= 3 ? 'good' : 'bad');
+      document.getElementById('growth-rate').className = 'kpi ' + (customerGrowth.includes('⬆️') ? 'good' : 'bad');
+      document.getElementById('net-revenue-growth').className = 'kpi ' + (netRevenueGrowth.includes('🟢') ? 'good' : 'bad');
+    }
+
+    function deleteEntry(index) {
+      data.splice(index, 1);
+      updateLocalStorage();
+      renderTable();
+      calculateKPIs();
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault(); // Prevent form from refreshing the page
+
+      const entry = {
+        period: document.getElementById('period').value.trim(),
+        mrr: Number(document.getElementById('mrr').value),
+        customers: Number(document.getElementById('customers').value),
+        churn: Number(document.getElementById('churn').value),
+        expenses: Number(document.getElementById('expenses').value),
+        cash: Number(document.getElementById('cash').value),
+      };
+
+      if (
+        !entry.period ||
+        isNaN(entry.mrr) ||
+        isNaN(entry.customers) ||
+        isNaN(entry.churn) ||
+        isNaN(entry.expenses) ||
+        isNaN(entry.cash)
+      ) {
+        alert("Please fill all fields with valid numbers.");
+        return;
+      }
+
+      data.push(entry);
+      updateLocalStorage();
+      form.reset();
+      renderTable();
+      calculateKPIs();
+    });
+
+    // Initial render
+    renderTable();
+    calculateKPIs();
+  </script>
+</body>
+</html>
